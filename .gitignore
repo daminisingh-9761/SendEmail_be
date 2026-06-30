@@ -1,0 +1,68 @@
+# ===========================
+# Python
+# ===========================
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual Environment
+venv/
+.venv/
+env/
+ENV/
+
+# Environment Variables
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+
+# OS Files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Python Build
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.mypy_cache/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Uploads (if storing resumes locally)
+uploads/
+temp/
+tmp/
+
+# SQLite (if used)
+*.sqlite3
+*.db
+
+# Alembic cache
+alembic/__pycache__/
+
+# Cache
+.cache/
+
+# Runtime
+*.pid
+
+# Secrets
+service-account.json
+credentials.json
+client_secret*.json
