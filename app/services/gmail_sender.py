@@ -45,12 +45,30 @@ def send_email_with_attachment(
     print("STEP 2 : Credentials created")
     service = build("gmail", "v1", credentials=creds)
     print("STEP 3 : Gmail service created")
-    message = MIMEMultipart()
+    message = MIMEMultipart("mixed")
     
     message["to"] = to
     message["from"] = sender_email
     message["subject"] = subject
-    message.attach(MIMEText(body, "plain"))
+
+    # Create alternative part for plain text and HTML
+    alt_part = MIMEMultipart("alternative")
+    
+    # Plain text version
+    alt_part.attach(MIMEText(body, "plain"))
+    
+    # HTML version (preserve line breaks with <br>)
+    html_body = body.replace("\n", "<br>")
+    html_content = f"""
+    <html>
+      <body style="font-family: Arial, sans-serif; font-size: 14px; line-height: 1.6; color: #333333;">
+        {html_body}
+      </body>
+    </html>
+    """
+    alt_part.attach(MIMEText(html_content, "html"))
+    
+    message.attach(alt_part)
 
     part = MIMEApplication(attachment_bytes, Name=attachment_filename)
     part["Content-Disposition"] = f'attachment; filename="{attachment_filename}"'
