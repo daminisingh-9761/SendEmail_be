@@ -14,7 +14,7 @@ from googleapiclient.discovery import build
 from app.core.config import get_settings
 
 settings = get_settings()
-
+print("gmail_sender.py imported")
 
 def _build_credentials(refresh_token: str) -> Credentials:
     return Credentials(
@@ -28,6 +28,7 @@ def _build_credentials(refresh_token: str) -> Credentials:
 
 
 def send_email_with_attachment(
+    
     refresh_token: str,
     sender_email: str,
     to: str,
@@ -36,10 +37,16 @@ def send_email_with_attachment(
     attachment_bytes: bytes,
     attachment_filename: str,
 ) -> str:
+    print(">>>>>>>> INSIDE send_email_with_attachment <<<<<<<<")
+    print("Sender:", sender_email)
+    print("Receiver:", to)
+    print("STEP 1 : Building credentials")
     creds = _build_credentials(refresh_token)
+    print("STEP 2 : Credentials created")
     service = build("gmail", "v1", credentials=creds)
-
+    print("STEP 3 : Gmail service created")
     message = MIMEMultipart()
+    
     message["to"] = to
     message["from"] = sender_email
     message["subject"] = subject
@@ -50,5 +57,8 @@ def send_email_with_attachment(
     message.attach(part)
 
     raw = base64.urlsafe_b64encode(message.as_bytes()).decode()
+    print("STEP 5 : Calling Gmail API")
     sent = service.users().messages().send(userId="me", body={"raw": raw}).execute()
+    print("STEP 6 : Gmail API returned")
+    print(sent)
     return sent["id"]

@@ -20,16 +20,18 @@ def _send_email_sync(refresh_token, sender_email, to, subject, body, attachment_
     )
 
 async def send_application_email_task(
+    
     refresh_token: str, sender_email: str, to: str, subject: str,
     body: str, attachment_bytes_b64: str, attachment_filename: str, application_id: str,
 ):
+    print("========== BACKGROUND TASK STARTED ==========")
     attachment_bytes = base64.b64decode(attachment_bytes_b64)
 
     try:
-        # Tenacity retry is synchronous here since gmail_sender is synchronous
         message_id = await asyncio.to_thread(
             _send_email_sync, refresh_token, sender_email, to, subject, body, attachment_bytes, attachment_filename
         )
+        logger.info(f"Email sent for application {application_id}, message_id={message_id}")
     except Exception as exc:
         logger.error(f"Failed to send email for application {application_id}: {exc}")
         await db.applications.update_one(

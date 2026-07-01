@@ -46,8 +46,9 @@ async def send_application(
     if not user.get("google_refresh_token"):
         raise HTTPException(
             428,
-            "Mail-send permission required. Re-authenticate with Google to grant the gmail.send scope.",
+            "Mail-send permission required. Please sign out and sign in again with Google to grant Gmail access.",
         )
+    refresh_token = user["google_refresh_token"]
 
     resume = await db.resumes.find_one({"id": a["resume_id"]})
     if resume is None:
@@ -69,8 +70,8 @@ async def send_application(
     # Queue the actual send using BackgroundTasks
     background_tasks.add_task(
         send_application_email_task,
-        user["google_refresh_token"],
-        user["email"],
+        refresh_token,
+        user.get("email", ""),
         payload.recipientEmail,
         payload.subject,
         payload.body,
@@ -92,8 +93,9 @@ async def resend_application(
     a = await db.applications.find_one({"id": application_id})
     if a is None or a["user_id"] != user["id"]:
         raise HTTPException(404, "Not found")
-    if not user.get("google_refresh_token"):
-        raise HTTPException(428, "Mail-send permission required.")
+    refresh_token = user.get("google_refresh_token")
+    if not refresh_token:
+        raise HTTPException(428, "Mail-send permission required. Please sign in again.")
 
     resume = await db.resumes.find_one({"id": a["resume_id"]})
     with open(resume["storage_path"], "rb") as f:
@@ -101,8 +103,8 @@ async def resend_application(
 
     background_tasks.add_task(
         send_application_email_task,
-        user["google_refresh_token"],
-        user["email"],
+        refresh_token,
+        user.get("email", ""),
         a["recipient_email"],
         a["subject"],
         a["body"],
@@ -123,8 +125,9 @@ async def follow_up(
     a = await db.applications.find_one({"id": application_id})
     if a is None or a["user_id"] != user["id"]:
         raise HTTPException(404, "Not found")
-    if not user.get("google_refresh_token"):
-        raise HTTPException(428, "Mail-send permission required.")
+    refresh_token = user.get("google_refresh_token")
+    if not refresh_token:
+        raise HTTPException(428, "Mail-send permission required. Please sign in again.")
 
     ai = get_ai_provider()
     job_dict = {"jobTitle": a["job_title"], "company": a["company"], "summary": a["job_summary"]}
@@ -137,8 +140,8 @@ async def follow_up(
     subject = f"Following up: {a['subject']}"
     background_tasks.add_task(
         send_application_email_task,
-        user["google_refresh_token"],
-        user["email"],
+        refresh_token,
+        user.get("email", ""),
         a["recipient_email"],
         subject,
         follow_up_body,

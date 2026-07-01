@@ -21,7 +21,7 @@ async def list_resumes(user: dict = Depends(get_current_user), db: AsyncIOMotorD
         for r in resumes
     ]
 
-
+print("Resume upload endpoint called")
 @router.post("", response_model=ResumeOut)
 async def upload_resume(
     file: UploadFile = File(...),
@@ -47,7 +47,9 @@ async def upload_resume(
         "is_default": True,
         "uploaded_at": datetime.utcnow()
     }
-    await db.resumes.insert_one(resume)
+    result = await db.resumes.insert_one(resume)
+    print("Inserted ID:", result.inserted_id)
+    
 
     return ResumeOut(
         id=resume["id"], fileName=resume["file_name"], uploadedAt=resume["uploaded_at"],
