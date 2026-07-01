@@ -9,8 +9,6 @@ import re
 import httpx
 from bs4 import BeautifulSoup
 from pypdf import PdfReader
-from PIL import Image
-import pytesseract
 import io
 
 from app.services.ai_provider import get_ai_provider
@@ -34,11 +32,6 @@ def text_from_pdf(file_bytes: bytes) -> str:
     return "\n".join(page.extract_text() or "" for page in reader.pages)
 
 
-def text_from_image(file_bytes: bytes) -> str:
-    image = Image.open(io.BytesIO(file_bytes))
-    return pytesseract.image_to_string(image)
-
-
 def find_candidate_emails(raw_text: str) -> list[str]:
     """Heuristic pass before the AI pass: prefer emails near words like
     'hr', 'careers', 'recruit', 'apply', and de-prioritize generic mailboxes."""
@@ -57,6 +50,22 @@ def find_candidate_emails(raw_text: str) -> list[str]:
     return [e for _, e in scored]
 
 
+async def extract_job_details_from_image(file_bytes: bytes, mime_type: str, source_type: str, source_raw: str) -> dict:
+    ai = get_ai_provider()
+    structured = await ai.extract_job_from_image(file_bytes, mime_type)
+
+    return {
+        "jobTitle": structured.get("jobTitle") or "Untitled role",
+        "company": structured.get("company") or "Unknown company",
+        "location": structured.get("location"),
+        "hrEmail": structured.get("hrEmail"),
+        "hrName": structured.get("hrName"),
+        "summary": structured.get("summary") or "",
+        "keyRequirements": structured.get("keyRequirements") or [],
+        "sourceType": source_type,
+        "sourceRaw": source_raw,
+    }
+
 async def extract_job_details(raw_text: str, source_type: str, source_raw: str) -> dict:
     ai = get_ai_provider()
     structured = await ai.extract_job(raw_text)
@@ -65,13 +74,13 @@ async def extract_job_details(raw_text: str, source_type: str, source_raw: str) 
     hr_email = structured.get("hrEmail") or (candidate_emails[0] if candidate_emails else None)
 
     return {
-        "jobTitle": structured.get("jobTitle", "Untitled role"),
-        "company": structured.get("company", "Unknown company"),
+        "jobTitle": structured.get("jobTitle") or "Untitled role",
+        "company": structured.get("company") or "Unknown company",
         "location": structured.get("location"),
         "hrEmail": hr_email,
         "hrName": structured.get("hrName"),
-        "summary": structured.get("summary", ""),
-        "keyRequirements": structured.get("keyRequirements", []),
+        "summary": structured.get("summary") or "",
+        "keyRequirements": structured.get("keyRequirements") or [],
         "sourceType": source_type,
         "sourceRaw": source_raw,
     }

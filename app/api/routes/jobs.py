@@ -44,10 +44,11 @@ async def extract_job_file(
     contents = await file.read()
     if file.content_type == "application/pdf":
         raw_text = job_extraction.text_from_pdf(contents)
+        details = await job_extraction.extract_job_details(raw_text, "file", file.filename)
+    elif file.content_type.startswith("image/"):
+        details = await job_extraction.extract_job_details_from_image(contents, file.content_type, "file", file.filename)
     else:
-        raw_text = job_extraction.text_from_image(contents)
-
-    details = await job_extraction.extract_job_details(raw_text, "file", file.filename)
+        raise HTTPException(400, "Unsupported file type. Only PDF and image files are supported.")
     application = await _create_draft_application(db, user, details)
     return _to_extracted_job_out(application)
 

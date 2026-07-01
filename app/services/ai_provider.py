@@ -27,6 +27,9 @@ class AIProvider(ABC):
     async def extract_job(self, raw_text: str) -> dict: ...
 
     @abstractmethod
+    async def extract_job_from_image(self, file_bytes: bytes, mime_type: str) -> dict: ...
+
+    @abstractmethod
     async def generate_email(self, job: dict, resume_text: str) -> dict: ...
 
     @abstractmethod
@@ -51,6 +54,23 @@ class OpenAIProvider(AIProvider):
 
     async def extract_job(self, raw_text: str) -> dict:
         return await self._json_completion(EXTRACT_SYSTEM_PROMPT, raw_text[:12000])
+
+    async def extract_job_from_image(self, file_bytes: bytes, mime_type: str) -> dict:
+        import base64
+        base64_image = base64.b64encode(file_bytes).decode('utf-8')
+        resp = await self.client.chat.completions.create(
+            model=self.model,
+            response_format={"type": "json_object"},
+            messages=[
+                {"role": "system", "content": EXTRACT_SYSTEM_PROMPT},
+                {"role": "user", "content": [
+                    {"type": "text", "text": "Extract job details from this image."},
+                    {"type": "image_url", "image_url": {"url": f"data:{mime_type};base64,{base64_image}"}}
+                ]}
+            ],
+            temperature=0.4,
+        )
+        return json.loads(resp.choices[0].message.content)
 
     async def generate_email(self, job: dict, resume_text: str) -> dict:
         user = f"JOB:\n{json.dumps(job)}\n\nRESUME TEXT:\n{resume_text[:6000]}"
@@ -83,6 +103,17 @@ class GeminiProvider(AIProvider):
 
     async def extract_job(self, raw_text: str) -> dict:
         return await self._json_completion(EXTRACT_SYSTEM_PROMPT, raw_text[:12000])
+
+    async def extract_job_from_image(self, file_bytes: bytes, mime_type: str) -> dict:
+        part = {
+            "mime_type": mime_type,
+            "data": file_bytes
+        }
+        resp = self.model.generate_content(
+            [EXTRACT_SYSTEM_PROMPT, part],
+            generation_config={"response_mime_type": "application/json"},
+        )
+        return json.loads(resp.text)
 
     async def generate_email(self, job: dict, resume_text: str) -> dict:
         user = f"JOB:\n{json.dumps(job)}\n\nRESUME TEXT:\n{resume_text[:6000]}"
