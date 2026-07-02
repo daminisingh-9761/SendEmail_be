@@ -9,6 +9,7 @@ from app.schemas.application import SendEmailRequest, ApplicationOut, JobOut, Em
 from app.api.deps import get_current_user
 from app.services.ai_provider import get_ai_provider
 from app.tasks.email_tasks import send_application_email_task
+from app.services import storage as storage_service
 
 router = APIRouter(prefix="/applications", tags=["applications"])
 
@@ -64,8 +65,8 @@ async def send_application(
     )
     a = await db.applications.find_one({"id": application_id})
 
-    with open(resume["storage_path"], "rb") as f:
-        attachment_bytes = f.read()
+    # Download resume bytes from Supabase Storage
+    attachment_bytes = storage_service.download_resume(resume["storage_path"])
 
     # Queue the actual send using BackgroundTasks
     background_tasks.add_task(
@@ -98,8 +99,8 @@ async def resend_application(
         raise HTTPException(428, "Mail-send permission required. Please sign in again.")
 
     resume = await db.resumes.find_one({"id": a["resume_id"]})
-    with open(resume["storage_path"], "rb") as f:
-        attachment_bytes = f.read()
+    # Download resume bytes from Supabase Storage
+    attachment_bytes = storage_service.download_resume(resume["storage_path"])
 
     background_tasks.add_task(
         send_application_email_task,
@@ -134,8 +135,8 @@ async def follow_up(
     follow_up_body = await ai.generate_follow_up(job_dict, a["body"])
 
     resume = await db.resumes.find_one({"id": a["resume_id"]})
-    with open(resume["storage_path"], "rb") as f:
-        attachment_bytes = f.read()
+    # Download resume bytes from Supabase Storage
+    attachment_bytes = storage_service.download_resume(resume["storage_path"])
 
     subject = f"Following up: {a['subject']}"
     background_tasks.add_task(

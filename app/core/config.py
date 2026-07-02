@@ -31,11 +31,16 @@ class Settings(BaseSettings):
     gemini_api_key: str = ""
     gemini_model: str = "gemini-1.5-flash"
 
-    # Storage
+    # Storage (local / S3 legacy)
     storage_backend: str = "local"
     storage_local_dir: str = "./uploads"
     s3_bucket: str = ""
     s3_region: str = ""
+
+    # Supabase Storage
+    supabase_url: str = ""
+    supabase_service_role_key: str = ""
+    supabase_bucket: str = "resumes"
 
     # JWT
     access_token_expire_minutes: int = 60 * 24 * 7  # 7 days
