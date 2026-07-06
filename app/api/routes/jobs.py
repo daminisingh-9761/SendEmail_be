@@ -59,6 +59,9 @@ async def generate_email(
     user: dict = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_db),
 ):
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info("===== generate_email endpoint called =====")
     application = await db.applications.find_one({"id": payload.jobId})
     if application is None or application["user_id"] != user["id"]:
         raise HTTPException(404, "Application not found")
@@ -67,9 +70,14 @@ async def generate_email(
     if resume is None or resume["user_id"] != user["id"]:
         raise HTTPException(404, "Resume not found")
 
-    resume_text = extract_resume_text(resume["storage_path"])
+    try:
+        resume_text = extract_resume_text(resume["storage_path"])
+    except Exception as e:
+        logger.error("Failed to extract resume text: %s", e)
+        raise HTTPException(400, "The associated resume file is missing or inaccessible. Please upload a new resume and try again.")
 
     ai = get_ai_provider()
+    logger.info("AI provider created")
     job_dict = {
         "jobTitle": application["job_title"],
         "company": application["company"],
@@ -77,7 +85,13 @@ async def generate_email(
         "summary": application["job_summary"],
         "keyRequirements": application["key_requirements"],
     }
-    email = await ai.generate_email(job_dict, resume_text)
+    logger.info("Calling AI provider to generate email...")
+    try:
+        email = await ai.generate_email(job_dict, resume_text)
+    except Exception as exc:
+        logger.error("AI email generation failed: %s", exc, exc_info=True)
+        raise HTTPException(500, f"AI generation failed: {exc}")
+    logger.info("AI email response received")
 
     await db.applications.update_one(
         {"id": application["id"]},

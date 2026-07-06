@@ -1,12 +1,13 @@
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from datetime import datetime
-import os, uuid
+import uuid
 
 from app.db.session import get_db
 from app.schemas.resume import ResumeOut
 from app.api.deps import get_current_user
 from app.core.config import get_settings
+from app.services import storage as storage_service
 
 router = APIRouter(prefix="/resumes", tags=["resumes"])
 settings = get_settings()
@@ -28,12 +29,9 @@ async def upload_resume(
     user: dict = Depends(get_current_user),
     db: AsyncIOMotorDatabase = Depends(get_db),
 ):
-    os.makedirs(settings.storage_local_dir, exist_ok=True)
     contents = await file.read()
-    storage_name = f"{uuid.uuid4()}_{file.filename}"
-    storage_path = os.path.join(settings.storage_local_dir, storage_name)
-    with open(storage_path, "wb") as f:
-        f.write(contents)
+    # Upload to Supabase Storage instead of local folder
+    storage_path = storage_service.upload_resume(file.filename, contents)
 
     # New uploads become the default resume going forward.
     await db.resumes.update_many({"user_id": user["id"]}, {"$set": {"is_default": False}})

@@ -8,6 +8,10 @@ class SendEmailRequest(BaseModel):
     body: str
 
 
+class EditEmailRequest(BaseModel):
+    instruction: str
+
+
 class FollowUpOut(BaseModel):
     id: str
     sentAt: datetime
