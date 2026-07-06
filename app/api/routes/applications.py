@@ -5,11 +5,12 @@ from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from app.db.session import get_db
-from app.schemas.application import SendEmailRequest, ApplicationOut, JobOut, EmailOut, FollowUpOut
+from app.schemas.application import SendEmailRequest, EditEmailRequest, ApplicationOut, JobOut, EmailOut, FollowUpOut
 from app.api.deps import get_current_user
 from app.services.ai_provider import get_ai_provider
 from app.tasks.email_tasks import send_application_email_task
 from app.services import storage as storage_service
+from app.services.resume_text import extract_resume_text
 
 router = APIRouter(prefix="/applications", tags=["applications"])
 
@@ -66,7 +67,10 @@ async def send_application(
     a = await db.applications.find_one({"id": application_id})
 
     # Download resume bytes from Supabase Storage
-    attachment_bytes = storage_service.download_resume(resume["storage_path"])
+    try:
+        attachment_bytes = storage_service.download_resume(resume["storage_path"])
+    except Exception as e:
+        raise HTTPException(400, "The associated resume file is missing or inaccessible. Please upload a new resume.")
 
     # Queue the actual send using BackgroundTasks
     background_tasks.add_task(
@@ -100,7 +104,10 @@ async def resend_application(
 
     resume = await db.resumes.find_one({"id": a["resume_id"]})
     # Download resume bytes from Supabase Storage
-    attachment_bytes = storage_service.download_resume(resume["storage_path"])
+    try:
+        attachment_bytes = storage_service.download_resume(resume["storage_path"])
+    except Exception as e:
+        raise HTTPException(400, "The associated resume file is missing or inaccessible. Please upload a new resume.")
 
     background_tasks.add_task(
         send_application_email_task,
@@ -113,6 +120,105 @@ async def resend_application(
         resume["file_name"],
         a["id"],
     )
+    return await _to_out(db, a)
+
+
+@router.post("/{application_id}/regenerate", response_model=ApplicationOut)
+async def regenerate_email(
+    application_id: str,
+    user: dict = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_db)
+):
+    a = await db.applications.find_one({"id": application_id})
+    if a is None or a["user_id"] != user["id"]:
+        raise HTTPException(404, "Not found")
+
+    resume = await db.resumes.find_one({"id": a["resume_id"]})
+    if not resume:
+        raise HTTPException(400, "Resume not found for this application")
+
+    try:
+        resume_text = extract_resume_text(resume["storage_path"])
+    except Exception as e:
+        raise HTTPException(400, "The associated resume file is missing or inaccessible. Please upload a new resume.")
+    job_dict = {
+        "jobTitle": a.get("job_title"),
+        "company": a.get("company"),
+        "summary": a.get("job_summary"),
+        "keyRequirements": a.get("key_requirements", []),
+        "location": a.get("location"),
+        "hrEmail": a.get("hr_email"),
+        "hrName": a.get("hr_name")
+    }
+
+    ai = get_ai_provider()
+    new_email = await ai.regenerate_email(
+        job=job_dict,
+        resume_text=resume_text,
+        previous_subject=a.get("subject", ""),
+        previous_body=a.get("body", "")
+    )
+
+    await db.applications.update_one(
+        {"id": application_id},
+        {"$set": {
+            "subject": new_email.get("subject", a.get("subject")),
+            "body": new_email.get("body", a.get("body"))
+        }}
+    )
+    
+    a = await db.applications.find_one({"id": application_id})
+    return await _to_out(db, a)
+
+
+@router.post("/{application_id}/edit", response_model=ApplicationOut)
+async def edit_email(
+    application_id: str,
+    payload: EditEmailRequest,
+    user: dict = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_db)
+):
+    a = await db.applications.find_one({"id": application_id})
+    if a is None or a["user_id"] != user["id"]:
+        raise HTTPException(404, "Not found")
+
+    resume = await db.resumes.find_one({"id": a["resume_id"]})
+    if not resume:
+        raise HTTPException(400, "Resume not found for this application")
+
+    try:
+        resume_text = extract_resume_text(resume["storage_path"])
+    except Exception as e:
+        raise HTTPException(400, "The associated resume file is missing or inaccessible. Please upload a new resume.")
+    
+    job_dict = {
+        "jobTitle": a.get("job_title"),
+        "company": a.get("company"),
+        "summary": a.get("job_summary"),
+        "keyRequirements": a.get("key_requirements", []),
+        "location": a.get("location"),
+        "hrEmail": a.get("hr_email"),
+        "hrName": a.get("hr_name")
+    }
+
+    ai = get_ai_provider()
+    edited_email = await ai.edit_email(
+        job=job_dict,
+        resume_text=resume_text,
+        current_subject=a.get("subject", ""),
+        current_body=a.get("body", ""),
+        instruction=payload.instruction
+    )
+
+    await db.applications.update_one(
+        {"id": application_id},
+        {"$set": {
+            "subject": edited_email.get("subject", a.get("subject")),
+            "body": edited_email.get("body", a.get("body"))
+        }}
+    )
+    
+    a = await db.applications.find_one({"id": application_id})
     return await _to_out(db, a)
 
 
@@ -136,7 +242,10 @@ async def follow_up(
 
     resume = await db.resumes.find_one({"id": a["resume_id"]})
     # Download resume bytes from Supabase Storage
-    attachment_bytes = storage_service.download_resume(resume["storage_path"])
+    try:
+        attachment_bytes = storage_service.download_resume(resume["storage_path"])
+    except Exception as e:
+        raise HTTPException(400, "The associated resume file is missing or inaccessible. Please upload a new resume.")
 
     subject = f"Following up: {a['subject']}"
     background_tasks.add_task(

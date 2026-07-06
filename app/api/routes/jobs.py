@@ -70,7 +70,11 @@ async def generate_email(
     if resume is None or resume["user_id"] != user["id"]:
         raise HTTPException(404, "Resume not found")
 
-    resume_text = extract_resume_text(resume["storage_path"])
+    try:
+        resume_text = extract_resume_text(resume["storage_path"])
+    except Exception as e:
+        logger.error("Failed to extract resume text: %s", e)
+        raise HTTPException(400, "The associated resume file is missing or inaccessible. Please upload a new resume and try again.")
 
     ai = get_ai_provider()
     logger.info("AI provider created")

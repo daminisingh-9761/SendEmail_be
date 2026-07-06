@@ -25,6 +25,25 @@ with a clear call to action. Sign off with the applicant's name. No markdown,
 no placeholders like [Your Name] left unfilled — use the actual resume name if found,
 otherwise sign 'Best regards,' with no name."""
 
+REGENERATE_EMAIL_SYSTEM_PROMPT = """You write concise, warm, specific job-application emails.
+Given a job summary, requirements, the applicant's resume text, and their PREVIOUS email draft,
+write a NEW JSON object with keys "subject" and "body".
+The new email MUST be meaningfully different in wording, structure, and tone from the previous email, 
+while remaining professional and highly relevant to the same job.
+The body should: reference the specific role and company, connect 2-3 concrete
+resume highlights to the listed requirements, stay under 200 words, and close
+with a clear call to action. Sign off with the applicant's name. No markdown,
+no placeholders like [Your Name] left unfilled."""
+
+EDIT_EMAIL_SYSTEM_PROMPT = """You are an expert copyeditor and job application coach.
+Given a job summary, requirements, the applicant's resume text, their current email draft,
+and a specific USER INSTRUCTION, modify the current email according to the instruction.
+Return a JSON object with keys "subject" and "body".
+You MUST preserve the existing content and structure of the email unless the user instruction 
+explicitly requires changes. Apply the user's edit seamlessly into the text. No markdown,
+no placeholders like [Your Name] left unfilled."""
+
+
 
 class AIProvider(ABC):
     @abstractmethod
@@ -35,6 +54,12 @@ class AIProvider(ABC):
 
     @abstractmethod
     async def generate_email(self, job: dict, resume_text: str) -> dict: ...
+
+    @abstractmethod
+    async def regenerate_email(self, job: dict, resume_text: str, previous_subject: str, previous_body: str) -> dict: ...
+
+    @abstractmethod
+    async def edit_email(self, job: dict, resume_text: str, current_subject: str, current_body: str, instruction: str) -> dict: ...
 
     @abstractmethod
     async def generate_follow_up(self, job: dict, original_body: str) -> str: ...
@@ -79,6 +104,14 @@ class OpenAIProvider(AIProvider):
     async def generate_email(self, job: dict, resume_text: str) -> dict:
         user = f"JOB:\n{json.dumps(job)}\n\nRESUME TEXT:\n{resume_text[:6000]}"
         return await self._json_completion(EMAIL_SYSTEM_PROMPT, user)
+
+    async def regenerate_email(self, job: dict, resume_text: str, previous_subject: str, previous_body: str) -> dict:
+        user = f"JOB:\n{json.dumps(job)}\n\nRESUME TEXT:\n{resume_text[:6000]}\n\nPREVIOUS EMAIL SUBJECT:\n{previous_subject}\n\nPREVIOUS EMAIL BODY:\n{previous_body}"
+        return await self._json_completion(REGENERATE_EMAIL_SYSTEM_PROMPT, user)
+
+    async def edit_email(self, job: dict, resume_text: str, current_subject: str, current_body: str, instruction: str) -> dict:
+        user = f"JOB:\n{json.dumps(job)}\n\nRESUME TEXT:\n{resume_text[:6000]}\n\nCURRENT EMAIL SUBJECT:\n{current_subject}\n\nCURRENT EMAIL BODY:\n{current_body}\n\nUSER INSTRUCTION:\n{instruction}"
+        return await self._json_completion(EDIT_EMAIL_SYSTEM_PROMPT, user)
 
     async def generate_follow_up(self, job: dict, original_body: str) -> str:
         system = "Write a brief, polite follow-up email (under 100 words) referencing the original application. Return plain text only."
@@ -133,6 +166,14 @@ class GeminiProvider(AIProvider):
     async def generate_email(self, job: dict, resume_text: str) -> dict:
         user = f"JOB:\n{json.dumps(job)}\n\nRESUME TEXT:\n{resume_text[:6000]}"
         return await self._json_completion(EMAIL_SYSTEM_PROMPT, user)
+
+    async def regenerate_email(self, job: dict, resume_text: str, previous_subject: str, previous_body: str) -> dict:
+        user = f"JOB:\n{json.dumps(job)}\n\nRESUME TEXT:\n{resume_text[:6000]}\n\nPREVIOUS EMAIL SUBJECT:\n{previous_subject}\n\nPREVIOUS EMAIL BODY:\n{previous_body}"
+        return await self._json_completion(REGENERATE_EMAIL_SYSTEM_PROMPT, user)
+
+    async def edit_email(self, job: dict, resume_text: str, current_subject: str, current_body: str, instruction: str) -> dict:
+        user = f"JOB:\n{json.dumps(job)}\n\nRESUME TEXT:\n{resume_text[:6000]}\n\nCURRENT EMAIL SUBJECT:\n{current_subject}\n\nCURRENT EMAIL BODY:\n{current_body}\n\nUSER INSTRUCTION:\n{instruction}"
+        return await self._json_completion(EDIT_EMAIL_SYSTEM_PROMPT, user)
 
     async def generate_follow_up(self, job: dict, original_body: str) -> str:
         prompt = (
