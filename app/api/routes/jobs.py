@@ -66,9 +66,9 @@ async def generate_email(
     if application is None or application["user_id"] != user["id"]:
         raise HTTPException(404, "Application not found")
 
-    resume = await db.resumes.find_one({"id": payload.resumeId})
-    if resume is None or resume["user_id"] != user["id"]:
-        raise HTTPException(404, "Resume not found")
+    resume = await db.resumes.find_one({"user_id": user["id"], "is_default": True})
+    if resume is None:
+        raise HTTPException(400, "Please upload a resume first to generate an email.")
 
     try:
         resume_text = extract_resume_text(resume["storage_path"])

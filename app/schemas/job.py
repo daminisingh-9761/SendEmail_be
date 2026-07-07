@@ -22,7 +22,7 @@ class ExtractedJobOut(BaseModel):
 
 class GenerateEmailRequest(BaseModel):
     jobId: str
-    resumeId: str
+    resumeId: str | None = None
 
 
 class GeneratedEmailOut(BaseModel):
