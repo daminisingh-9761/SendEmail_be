@@ -33,9 +33,6 @@ async def upload_resume(
     # Upload to Supabase Storage instead of local folder
     storage_path = storage_service.upload_resume(file.filename, contents)
 
-    # New uploads become the default resume going forward.
-    await db.resumes.update_many({"user_id": user["id"]}, {"$set": {"is_default": False}})
-
     resume = {
         "id": str(uuid.uuid4()),
         "user_id": user["id"],
@@ -46,6 +43,12 @@ async def upload_resume(
         "uploaded_at": datetime.utcnow()
     }
     result = await db.resumes.insert_one(resume)
+    
+    # Update all of the user's previous resumes to is_default=False
+    await db.resumes.update_many(
+        {"user_id": user["id"], "id": {"$ne": resume["id"]}},
+        {"$set": {"is_default": False}}
+    )
     print("Inserted ID:", result.inserted_id)
     
 
@@ -57,11 +60,23 @@ async def upload_resume(
 
 @router.patch("/{resume_id}/default", response_model=ResumeOut)
 async def set_default_resume(resume_id: str, user: dict = Depends(get_current_user), db: AsyncIOMotorDatabase = Depends(get_db)):
-    await db.resumes.update_many({"user_id": user["id"]}, {"$set": {"is_default": False}})
-    await db.resumes.update_one({"id": resume_id, "user_id": user["id"]}, {"$set": {"is_default": True}})
-    
-    r = await db.resumes.find_one({"id": resume_id})
+    r = await db.resumes.find_one({"id": resume_id, "user_id": user["id"]})
     if not r:
         raise HTTPException(404, "Resume not found")
-        
-    return ResumeOut(id=r["id"], fileName=r["file_name"], uploadedAt=r["uploaded_at"], isDefault=r.get("is_default", False), sizeKb=r.get("size_kb", 0))
+
+    await db.resumes.update_many(
+        {"user_id": user["id"], "id": {"$ne": resume_id}},
+        {"$set": {"is_default": False}}
+    )
+    await db.resumes.update_one(
+        {"id": resume_id, "user_id": user["id"]},
+        {"$set": {"is_default": True}}
+    )
+    
+    return ResumeOut(
+        id=r["id"], 
+        fileName=r["file_name"], 
+        uploadedAt=r["uploaded_at"], 
+        isDefault=True, 
+        sizeKb=r.get("size_kb", 0)
+    )
