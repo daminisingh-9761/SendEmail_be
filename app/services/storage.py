@@ -52,3 +52,16 @@ def delete_resume(path: str):
     """
 
     supabase.storage.from_(BUCKET).remove([path])
+
+
+def file_exists(storage_path: str) -> bool:
+    """
+    Check if a resume exists in Supabase Storage.
+    """
+    try:
+        # Using download-based validation as exists() might not be supported
+        supabase.storage.from_(BUCKET).download(storage_path)
+        return True
+    except Exception as e:
+        print(f"Error checking file existence: {e}")
+        return False
