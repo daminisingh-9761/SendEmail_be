@@ -17,9 +17,17 @@ settings = get_settings()
 async def list_resumes(user: dict = Depends(get_current_user), db: AsyncIOMotorDatabase = Depends(get_db)):
     cursor = db.resumes.find({"user_id": user["id"]}).sort("uploaded_at", -1)
     resumes = await cursor.to_list(length=100)
+    
+    valid_resumes = []
+    for r in resumes:
+        if storage_service.file_exists(r["storage_path"]):
+            valid_resumes.append(r)
+        else:
+            await db.resumes.delete_one({"id": r["id"]})
+
     return [
         ResumeOut(id=r["id"], fileName=r["file_name"], uploadedAt=r["uploaded_at"], isDefault=r.get("is_default", False), sizeKb=r.get("size_kb", 0))
-        for r in resumes
+        for r in valid_resumes
     ]
 
 print("Resume upload endpoint called")
