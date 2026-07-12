@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     # Environment
     env: str = "development"
     secret_key: str = "dev-secret"
-    frontend_url: str = "http://localhost:5173"
+    frontend_urls: str = "http://localhost:5173"
 
     # MongoDB
     mongodb_url: str

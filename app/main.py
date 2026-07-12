@@ -8,9 +8,11 @@ settings = get_settings()
 
 app = FastAPI(title="Mailjob API", version="1.0.0")
 
+origins = [url.strip() for url in settings.frontend_urls.split(",")]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.frontend_url],
+    allow_origins=origins,
     allow_origin_regex=r"https://.*\.ngrok-free\.app",
     allow_credentials=True,
     allow_methods=["*"],
