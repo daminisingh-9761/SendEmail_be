@@ -152,12 +152,17 @@ async def regenerate_email(
     }
 
     ai = get_ai_provider()
-    new_email = await ai.regenerate_email(
-        job=job_dict,
-        resume_text=resume_text,
-        previous_subject=a.get("subject", ""),
-        previous_body=a.get("body", "")
-    )
+    try:
+        new_email = await ai.regenerate_email(
+            job=job_dict,
+            resume_text=resume_text,
+            previous_subject=a.get("subject", ""),
+            previous_body=a.get("body", "")
+        )
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).error("AI email regeneration failed: %s", exc, exc_info=True)
+        raise HTTPException(400, f"AI regeneration failed: {exc}")
 
     await db.applications.update_one(
         {"id": application_id},
@@ -202,13 +207,18 @@ async def edit_email(
     }
 
     ai = get_ai_provider()
-    edited_email = await ai.edit_email(
-        job=job_dict,
-        resume_text=resume_text,
-        current_subject=a.get("subject", ""),
-        current_body=a.get("body", ""),
-        instruction=payload.instruction
-    )
+    try:
+        edited_email = await ai.edit_email(
+            job=job_dict,
+            resume_text=resume_text,
+            current_subject=a.get("subject", ""),
+            current_body=a.get("body", ""),
+            instruction=payload.instruction
+        )
+    except Exception as exc:
+        import logging
+        logging.getLogger(__name__).error("AI email editing failed: %s", exc, exc_info=True)
+        raise HTTPException(400, f"AI edit failed: {exc}")
 
     await db.applications.update_one(
         {"id": application_id},
