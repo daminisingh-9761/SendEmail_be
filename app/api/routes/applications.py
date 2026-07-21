@@ -1,11 +1,12 @@
 import base64
 import uuid
 from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from typing import Optional
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Query
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
 from app.db.session import get_db
-from app.schemas.application import SendEmailRequest, EditEmailRequest, ApplicationOut, JobOut, EmailOut, FollowUpOut
+from app.schemas.application import SendEmailRequest, EditEmailRequest, ApplicationOut, JobOut, EmailOut, FollowUpOut, PaginatedApplicationsOut, DeleteApplicationsRequest
 from app.api.deps import get_current_user
 from app.services.ai_provider import get_ai_provider
 from app.tasks.email_tasks import send_application_email_task
@@ -15,14 +16,64 @@ from app.services.resume_text import extract_resume_text
 router = APIRouter(prefix="/applications", tags=["applications"])
 
 
-@router.get("", response_model=list[ApplicationOut])
-async def list_applications(user: dict = Depends(get_current_user), db: AsyncIOMotorDatabase = Depends(get_db)):
-    cursor = db.applications.find({"user_id": user["id"]}).sort("created_at", -1)
-    apps = await cursor.to_list(length=100)
+@router.get("", response_model=PaginatedApplicationsOut)
+async def list_applications(
+    status: Optional[str] = Query(None, description="Filter by status (e.g. 'draft', 'sent')"),
+    date_from: Optional[datetime] = Query(None, description="Start date (inclusive)"),
+    date_to: Optional[datetime] = Query(None, description="End date (inclusive)"),
+    page: int = Query(1, ge=1, description="Page number"),
+    limit: int = Query(10, ge=1, le=100, description="Items per page"),
+    user: dict = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_db)
+):
+    query = {"user_id": user["id"]}
+    if status:
+        query["status"] = status
+        
+    if date_from or date_to:
+        query["created_at"] = {}
+        if date_from:
+            query["created_at"]["$gte"] = date_from
+        if date_to:
+            query["created_at"]["$lte"] = date_to
+            
+    total = await db.applications.count_documents(query)
+    
+    skip = (page - 1) * limit
+    cursor = db.applications.find(query).sort("created_at", -1).skip(skip).limit(limit)
+    apps = await cursor.to_list(length=limit)
+    
     out = []
     for a in apps:
         out.append(await _to_out(db, a))
-    return out
+        
+    pages = (total + limit - 1) // limit
+    
+    return PaginatedApplicationsOut(
+        items=out,
+        total=total,
+        page=page,
+        pages=pages,
+        limit=limit
+    )
+
+
+@router.delete("", status_code=200)
+async def delete_applications(
+    payload: DeleteApplicationsRequest,
+    user: dict = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_db)
+):
+    if not payload.ids:
+        return {"deleted_count": 0}
+        
+    # Verify ownership before deleting
+    result = await db.applications.delete_many({
+        "id": {"$in": payload.ids},
+        "user_id": user["id"]
+    })
+    
+    return {"deleted_count": result.deleted_count}
 
 
 @router.get("/{application_id}", response_model=ApplicationOut)
