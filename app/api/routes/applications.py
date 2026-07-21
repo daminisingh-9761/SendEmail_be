@@ -293,9 +293,15 @@ async def _to_out(db: AsyncIOMotorDatabase, a: dict) -> ApplicationOut:
     return ApplicationOut(
         id=a["id"],
         job=JobOut(
-            jobTitle=a["job_title"], company=a["company"], location=a.get("location"), hrEmail=a.get("hr_email"),
-            hrName=a.get("hr_name"), summary=a["job_summary"], keyRequirements=a["key_requirements"],
-            sourceType=a["source_type"], sourceRaw=a["source_raw"],
+            jobTitle=a.get("job_title") or "",
+            company=a.get("company") or "",
+            location=a.get("location"),
+            hrEmail=a.get("hr_email"),
+            hrName=a.get("hr_name"),
+            summary=a.get("job_summary") or "",
+            keyRequirements=a.get("key_requirements") or [],
+            sourceType=a.get("source_type") or "",
+            sourceRaw=a.get("source_raw") or "",
         ),
         email=EmailOut(subject=a.get("subject") or "", body=a.get("body") or ""),
         recipientEmail=a.get("recipient_email") or "",
