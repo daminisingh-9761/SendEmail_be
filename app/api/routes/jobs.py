@@ -90,7 +90,7 @@ async def generate_email(
         email = await ai.generate_email(job_dict, resume_text)
     except Exception as exc:
         logger.error("AI email generation failed: %s", exc, exc_info=True)
-        raise HTTPException(500, f"AI generation failed: {exc}")
+        raise HTTPException(400, f"AI generation failed: {exc}")
     logger.info("AI email response received")
 
     await db.applications.update_one(

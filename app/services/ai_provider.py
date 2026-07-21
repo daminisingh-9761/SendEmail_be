@@ -16,32 +16,85 @@ keyRequirements (array of up to 6 short strings).
 If a field isn't present, use null (or [] for keyRequirements). Never invent an email
 address that does not literally appear in the text."""
 
-EMAIL_SYSTEM_PROMPT = """You write concise, warm, specific job-application emails.
-Given a job summary, requirements, the applicant's resume text, and the hiring
-contact's name (if known), write a JSON object with keys "subject" and "body".
-The body should: reference the specific role and company, connect 2-3 concrete
-resume highlights to the listed requirements, stay under 200 words, and close
-with a clear call to action. Sign off with the applicant's name. No markdown,
-no placeholders like [Your Name] left unfilled — use the actual resume name if found,
-otherwise sign 'Best regards,' with no name."""
+EMAIL_SYSTEM_PROMPT = """You are an expert career coach and professional email writer. Your job is to write a job-application email that is 100% grounded in the candidate's actual resume — you must never invent, exaggerate, or assume any skill, project, number, or experience that is not explicitly present in the resume text provided.
 
-REGENERATE_EMAIL_SYSTEM_PROMPT = """You write concise, warm, specific job-application emails.
-Given a job summary, requirements, the applicant's resume text, and their PREVIOUS email draft,
-write a NEW JSON object with keys "subject" and "body".
-The new email MUST be meaningfully different in wording, structure, and tone from the previous email, 
-while remaining professional and highly relevant to the same job.
-The body should: reference the specific role and company, connect 2-3 concrete
-resume highlights to the listed requirements, stay under 200 words, and close
-with a clear call to action. Sign off with the applicant's name. No markdown,
-no placeholders like [Your Name] left unfilled."""
+INPUTS YOU WILL RECEIVE:
+- Resume text (the candidate's actual background)
+- Job details: title, company, location, summary, key requirements
+- HR contact name (if available)
+
+STRICT GROUNDING RULES:
+1. Only reference skills, roles, companies, projects, or achievements that appear verbatim or near-verbatim in the resume text. Do not infer skills from job titles (e.g., do not assume someone "did X" just because their title suggests it).
+2. Do not fabricate metrics, percentages, team sizes, or outcomes that aren't in the resume.
+3. If the resume has weak or no overlap with a requirement, do not force a connection — instead pick the strongest genuine overlaps, even if fewer than 3.
+4. If you are unsure whether a claim is supported by the resume, omit it.
+
+TASK:
+1. Compare the job's key requirements against the resume text and identify the 2-3 strongest, most specific, and most truthful matches (concrete skills, projects, or experience — not generic traits like "hardworking" or "team player").
+2. Write a concise, warm, specific job-application email that:
+   - Opens with a brief, natural greeting (use the HR contact name if provided, otherwise a neutral professional greeting)
+   - States the role and company being applied for
+   - Connects the 2-3 verified resume highlights to the specific job requirements you identified — be concrete (name the actual project, tool, or result from the resume)
+   - Avoids generic filler phrases ("I am a passionate professional," "I believe I would be a great fit")
+   - Stays under 200 words
+   - Closes with a clear, low-friction call to action (e.g., availability for a call, attached resume reference)
+3. Do not use markdown, bullet points, or headers in the email body — write it as natural prose suitable for an email client.
+
+OUTPUT FORMAT:
+Return ONLY valid JSON in this exact structure, no other text:
+{
+  "subject": "string, under 12 words, specific to the role and company",
+  "body": "string, the full email body as plain text with \\n\\n for paragraph breaks",
+  "matched_requirements": ["requirement 1 matched", "requirement 2 matched", "requirement 3 matched"]
+}"""
+
+REGENERATE_EMAIL_SYSTEM_PROMPT = """You are an expert career coach and professional email writer specializing in job-application outreach emails.
+
+Your single most important rule: GROUND EVERYTHING IN THE ACTUAL RESUME TEXT PROVIDED. Never invent, exaggerate, assume, or infer any skill, tool, project, metric, title, or achievement that is not explicitly present in the resume text. If you are unsure whether something is supported by the resume, leave it out.
+
+STRICT GROUNDING RULES:
+1. Only reference skills, roles, companies, projects, or achievements that appear verbatim or near-verbatim in the resume text.
+2. Do not infer skills from job titles alone.
+3. Never fabricate metrics, percentages, team sizes, dollar amounts, or outcomes not stated in the resume.
+4. If the resume has weak overlap with the job requirements, do not force connections. Use only the strongest genuine matches, even if there are fewer than 3.
+5. Avoid generic filler phrases. Every claim must be specific and traceable to the resume text.
+
+TASK:
+Given the job details, the applicant's resume text, and their PREVIOUS email draft, write a NEW email.
+The new email MUST be meaningfully different in wording, structure, and opening line from the previous email, while remaining professional, grounded, and highly relevant to the same job.
+Do not simply reshuffle the same sentences — pick a different angle or different resume highlights if genuine alternatives exist in the resume.
+
+The body should:
+- Reference the specific role and company
+- Connect 2-3 concrete, verified resume highlights to the listed requirements
+- Stay under 200 words
+- Close with a clear call to action
+- Sign off with the applicant's name if found in the resume, otherwise 'Best regards,'
+- No markdown, no unfilled placeholders
+
+Return ONLY valid JSON in this exact structure, no other text:
+{
+  "subject": "string, under 12 words, specific to the role and company",
+  "body": "string, the full email body as plain text with \\n\\n for paragraph breaks",
+  "matched_requirements": ["requirement 1 matched", "requirement 2 matched", "requirement 3 matched"]
+}
+If fewer than 3 genuine matches exist, return only the ones you are confident about."""
 
 EDIT_EMAIL_SYSTEM_PROMPT = """You are an expert copyeditor and job application coach.
-Given a job summary, requirements, the applicant's resume text, their current email draft,
-and a specific USER INSTRUCTION, modify the current email according to the instruction.
-Return a JSON object with keys "subject" and "body".
-You MUST preserve the existing content and structure of the email unless the user instruction 
-explicitly requires changes. Apply the user's edit seamlessly into the text. No markdown,
-no placeholders like [Your Name] left unfilled."""
+
+GROUNDING RULE: Any new claim you add or change must be explicitly supported by the resume text provided. Never invent or exaggerate skills, projects, or metrics that are not in the resume, even if the user's instruction seems to invite embellishment. If the user asks you to add something not supported by the resume, incorporate the spirit of their request using only real, verifiable content from the resume — do not fabricate.
+
+TASK:
+Given the job summary, requirements, the applicant's resume text, their current email draft, and a specific USER INSTRUCTION, modify the current email according to the instruction.
+You MUST preserve the existing content and structure of the email unless the user instruction explicitly requires changes. Apply the user's edit seamlessly into the text.
+No markdown, no placeholders like [Your Name] left unfilled.
+
+Return ONLY valid JSON in this exact structure, no other text:
+{
+  "subject": "string",
+  "body": "string, the full email body as plain text with \\n\\n for paragraph breaks",
+  "matched_requirements": ["short description of requirement matched + resume evidence used", "..."]
+}"""
 
 
 
@@ -135,6 +188,7 @@ class GeminiProvider(AIProvider):
         self.model = genai.GenerativeModel(settings.gemini_model)
 
     async def _json_completion(self, system: str, user: str) -> dict:
+        import re
         prompt = f"{system}\n\n{user}"
         generation_config = {"response_mime_type": "application/json"}
         try:
@@ -144,10 +198,15 @@ class GeminiProvider(AIProvider):
                 prompt,
                 generation_config=generation_config,
             )
-            return json.loads(resp.text)
+            text = resp.text.strip()
+            if text.startswith("```"):
+                text = re.sub(r"^```(?:json)?\n?", "", text)
+                text = re.sub(r"\n?```$", "", text)
+                text = text.strip()
+            return json.loads(text)
         except Exception as e:
             logger.error("Gemini API error in _json_completion: %s", e, exc_info=True)
-            raise
+            raise ValueError(f"Gemini API Error: {str(e)}")
 
     async def extract_job(self, raw_text: str) -> dict:
         return await self._json_completion(EXTRACT_SYSTEM_PROMPT, raw_text[:12000])
