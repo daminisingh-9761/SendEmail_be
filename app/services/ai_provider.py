@@ -30,15 +30,16 @@ STRICT GROUNDING RULES:
 4. If you are unsure whether a claim is supported by the resume, omit it.
 
 TASK:
-1. Compare the job's key requirements against the resume text and identify the 2-3 strongest, most specific, and most truthful matches (concrete skills, projects, or experience — not generic traits like "hardworking" or "team player").
-2. Write a concise, warm, specific job-application email that:
-   - Opens with a brief, natural greeting (use the HR contact name if provided, otherwise a neutral professional greeting)
+3. Compare the job's key requirements against the resume text and identify the 2-3 strongest, most specific, and most truthful matches (concrete skills, projects, or experience — not generic traits like "hardworking" or "team player").
+4. Write a concise, warm, specific job-application email that:
+   - Opens with a brief, natural greeting. Vary the greeting by using either "Hi" or "Dear" (e.g., "Hi [Name]," or "Dear [Name],"). If `hrName` is provided, use it. If `hrName` is null but `hrEmail` contains a person's name (e.g., john.doe@...), extract the first name and use it. Note that the contact might be any employee, not just HR. If the email is generic (e.g., hr@, careers@, info@, contact@) or absent, use a general greeting like "Hi Team," or "Dear Hiring Team,".
    - States the role and company being applied for
    - Connects the 2-3 verified resume highlights to the specific job requirements you identified — be concrete (name the actual project, tool, or result from the resume)
    - Avoids generic filler phrases ("I am a passionate professional," "I believe I would be a great fit")
+   - Do NOT use any contractions or short forms (e.g., write "I am" instead of "I'm", "do not" instead of "don't"). Avoid using the apostrophe symbol (') anywhere in the email body to ensure it feels like a natural, human-written email rather than AI-generated.
    - Stays under 200 words
    - Closes with a clear, low-friction call to action (e.g., availability for a call, attached resume reference)
-3. Do not use markdown, bullet points, or headers in the email body — write it as natural prose suitable for an email client.
+5. Do not use markdown, bullet points, or headers in the email body — write it as natural prose suitable for an email client.
 
 OUTPUT FORMAT:
 Return ONLY valid JSON in this exact structure, no other text:
@@ -65,11 +66,13 @@ The new email MUST be meaningfully different in wording, structure, and opening 
 Do not simply reshuffle the same sentences — pick a different angle or different resume highlights if genuine alternatives exist in the resume.
 
 The body should:
+- Open with a proper greeting. Vary the greeting by using either "Hi" or "Dear". Use `hrName` if available. If `hrName` is null but `hrEmail` contains a person's name, extract their first name. Note the contact might be any employee. If it's a generic email (hr@, info@, etc.) or absent, use a general greeting like "Hi Team," or "Dear Hiring Team,".
 - Reference the specific role and company
 - Connect 2-3 concrete, verified resume highlights to the listed requirements
 - Stay under 200 words
 - Close with a clear call to action
 - Sign off with the applicant's name if found in the resume, otherwise 'Best regards,'
+- Do NOT use any contractions or short forms (e.g., write "I am" instead of "I'm"). Avoid using the apostrophe symbol (') anywhere in the body to ensure it feels natural.
 - No markdown, no unfilled placeholders
 
 Return ONLY valid JSON in this exact structure, no other text:
@@ -87,7 +90,11 @@ GROUNDING RULE: Any new claim you add or change must be explicitly supported by 
 TASK:
 Given the job summary, requirements, the applicant's resume text, their current email draft, and a specific USER INSTRUCTION, modify the current email according to the instruction.
 You MUST preserve the existing content and structure of the email unless the user instruction explicitly requires changes. Apply the user's edit seamlessly into the text.
-No markdown, no placeholders like [Your Name] left unfilled.
+
+ADDITIONAL RULES FOR ANY EDITED TEXT:
+1. Do NOT use any contractions or short forms (e.g., write "I am" instead of "I'm", "do not" instead of "don't"). Avoid using the apostrophe symbol (') anywhere in the email body to ensure it feels natural.
+2. If the user instruction requires changing the greeting, vary it by using either "Hi" or "Dear". If a name is needed, use `hrName` or extract the first name from `hrEmail`. If generic or absent, use "Hi Team," or "Dear Hiring Team,".
+3. No markdown, no bullet points, and no placeholders like [Your Name] left unfilled.
 
 Return ONLY valid JSON in this exact structure, no other text:
 {
