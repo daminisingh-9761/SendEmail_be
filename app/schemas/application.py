@@ -47,3 +47,15 @@ class ApplicationOut(BaseModel):
     sentAt: datetime | None = None
     followUps: list[FollowUpOut]
     aiSuggestions: list[str]
+
+
+class PaginatedApplicationsOut(BaseModel):
+    items: list[ApplicationOut]
+    total: int
+    page: int
+    pages: int
+    limit: int
+
+
+class DeleteApplicationsRequest(BaseModel):
+    ids: list[str]
