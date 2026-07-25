@@ -6,7 +6,6 @@ class ResumeOut(BaseModel):
     id: str
     fileName: str
     uploadedAt: datetime
-    isDefault: bool
     sizeKb: int
 
     class Config:

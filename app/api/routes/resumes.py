@@ -26,12 +26,12 @@ async def list_resumes(user: dict = Depends(get_current_user), db: AsyncIOMotorD
             await db.resumes.delete_one({"id": r["id"]})
 
     return [
-        ResumeOut(id=r["id"], fileName=r["file_name"], uploadedAt=r["uploaded_at"], isDefault=r.get("is_default", False), sizeKb=r.get("size_kb", 0))
+        ResumeOut(id=r["id"], fileName=r["file_name"], uploadedAt=r["uploaded_at"], sizeKb=r.get("size_kb", 0))
         for r in valid_resumes
     ]
 
 print("Resume upload endpoint called")
-@router.post("", response_model=ResumeOut)
+@router.post("", response_model=list[ResumeOut])
 async def upload_resume(
     file: UploadFile = File(...),
     user: dict = Depends(get_current_user),
@@ -47,44 +47,43 @@ async def upload_resume(
         "file_name": file.filename,
         "storage_path": storage_path,
         "size_kb": max(1, len(contents) // 1024),
-        "is_default": True,
         "uploaded_at": datetime.utcnow()
     }
     result = await db.resumes.insert_one(resume)
     
-    # Update all of the user's previous resumes to is_default=False
-    await db.resumes.update_many(
-        {"user_id": user["id"], "id": {"$ne": resume["id"]}},
-        {"$set": {"is_default": False}}
-    )
     print("Inserted ID:", result.inserted_id)
     
+    # Return the updated list of resumes
+    cursor = db.resumes.find({"user_id": user["id"]}).sort("uploaded_at", -1)
+    resumes = await cursor.to_list(length=100)
+    
+    valid_resumes = []
+    for r in resumes:
+        if storage_service.file_exists(r["storage_path"]):
+            valid_resumes.append(r)
+        else:
+            await db.resumes.delete_one({"id": r["id"]})
 
-    return ResumeOut(
-        id=resume["id"], fileName=resume["file_name"], uploadedAt=resume["uploaded_at"],
-        isDefault=resume["is_default"], sizeKb=resume["size_kb"],
-    )
+    return [
+        ResumeOut(id=r["id"], fileName=r["file_name"], uploadedAt=r["uploaded_at"], sizeKb=r.get("size_kb", 0))
+        for r in valid_resumes
+    ]
 
-
-@router.patch("/{resume_id}/default", response_model=ResumeOut)
-async def set_default_resume(resume_id: str, user: dict = Depends(get_current_user), db: AsyncIOMotorDatabase = Depends(get_db)):
+@router.delete("/{resume_id}")
+async def delete_resume(
+    resume_id: str, 
+    user: dict = Depends(get_current_user), 
+    db: AsyncIOMotorDatabase = Depends(get_db)
+):
     r = await db.resumes.find_one({"id": resume_id, "user_id": user["id"]})
     if not r:
         raise HTTPException(404, "Resume not found")
 
-    await db.resumes.update_many(
-        {"user_id": user["id"], "id": {"$ne": resume_id}},
-        {"$set": {"is_default": False}}
-    )
-    await db.resumes.update_one(
-        {"id": resume_id, "user_id": user["id"]},
-        {"$set": {"is_default": True}}
-    )
-    
-    return ResumeOut(
-        id=r["id"], 
-        fileName=r["file_name"], 
-        uploadedAt=r["uploaded_at"], 
-        isDefault=True, 
-        sizeKb=r.get("size_kb", 0)
-    )
+    try:
+        storage_service.delete_resume(r["storage_path"])
+    except Exception as e:
+        print(f"Error deleting file from storage: {e}")
+        # Continue to delete from DB even if storage deletion fails
+        
+    await db.resumes.delete_one({"id": resume_id})
+    return {"message": "Resume deleted successfully"}
