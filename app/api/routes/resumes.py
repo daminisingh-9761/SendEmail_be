@@ -26,7 +26,7 @@ async def list_resumes(user: dict = Depends(get_current_user), db: AsyncIOMotorD
             await db.resumes.delete_one({"id": r["id"]})
 
     return [
-        ResumeOut(id=r["id"], fileName=r["file_name"], uploadedAt=r["uploaded_at"], sizeKb=r.get("size_kb", 0))
+        ResumeOut(id=r["id"], fileName=r["file_name"], uploadedAt=r["uploaded_at"], isDefault=r.get("is_default", False), sizeKb=r.get("size_kb", 0))
         for r in valid_resumes
     ]
 
@@ -47,6 +47,7 @@ async def upload_resume(
         "file_name": file.filename,
         "storage_path": storage_path,
         "size_kb": max(1, len(contents) // 1024),
+        "is_default": False,
         "uploaded_at": datetime.utcnow()
     }
     result = await db.resumes.insert_one(resume)
@@ -65,7 +66,41 @@ async def upload_resume(
             await db.resumes.delete_one({"id": r["id"]})
 
     return [
-        ResumeOut(id=r["id"], fileName=r["file_name"], uploadedAt=r["uploaded_at"], sizeKb=r.get("size_kb", 0))
+        ResumeOut(id=r["id"], fileName=r["file_name"], uploadedAt=r["uploaded_at"], isDefault=r.get("is_default", False), sizeKb=r.get("size_kb", 0))
+        for r in valid_resumes
+    ]
+
+@router.patch("/{resume_id}/default", response_model=list[ResumeOut])
+async def set_default_resume(
+    resume_id: str, 
+    user: dict = Depends(get_current_user), 
+    db: AsyncIOMotorDatabase = Depends(get_db)
+):
+    r = await db.resumes.find_one({"id": resume_id, "user_id": user["id"]})
+    if not r:
+        raise HTTPException(404, "Resume not found")
+
+    await db.resumes.update_many(
+        {"user_id": user["id"], "id": {"$ne": resume_id}},
+        {"$set": {"is_default": False}}
+    )
+    await db.resumes.update_one(
+        {"id": resume_id, "user_id": user["id"]},
+        {"$set": {"is_default": True}}
+    )
+    
+    cursor = db.resumes.find({"user_id": user["id"]}).sort("uploaded_at", -1)
+    resumes = await cursor.to_list(length=100)
+    
+    valid_resumes = []
+    for res in resumes:
+        if storage_service.file_exists(res["storage_path"]):
+            valid_resumes.append(res)
+        else:
+            await db.resumes.delete_one({"id": res["id"]})
+
+    return [
+        ResumeOut(id=r["id"], fileName=r["file_name"], uploadedAt=r["uploaded_at"], isDefault=r.get("is_default", False), sizeKb=r.get("size_kb", 0))
         for r in valid_resumes
     ]
 
