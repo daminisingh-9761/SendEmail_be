@@ -66,9 +66,12 @@ async def generate_email(
     if application is None or application["user_id"] != user["id"]:
         raise HTTPException(404, "Application not found")
 
-    resume = await db.resumes.find_one({"user_id": user["id"], "is_default": True})
+    if not payload.resumeId:
+        raise HTTPException(400, "Please select a resume to generate an email.")
+
+    resume = await db.resumes.find_one({"id": payload.resumeId, "user_id": user["id"]})
     if resume is None:
-        raise HTTPException(400, "Please upload a resume first to generate an email.")
+        raise HTTPException(404, "Selected resume not found.")
 
     try:
         resume_text = extract_resume_text(resume["storage_path"])
@@ -107,14 +110,10 @@ async def generate_email(
 
 
 async def _create_draft_application(db: AsyncIOMotorDatabase, user: dict, details: dict) -> dict:
-    resume = await db.resumes.find_one({"user_id": user["id"], "is_default": True})
-    if resume is None:
-        raise HTTPException(400, "Upload a resume first")
-
     application = {
         "id": str(uuid.uuid4()),
         "user_id": user["id"],
-        "resume_id": resume["id"],
+        "resume_id": None,
         "job_title": details["jobTitle"],
         "company": details["company"],
         "location": details.get("location"),
