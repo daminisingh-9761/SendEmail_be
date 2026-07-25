@@ -65,3 +65,14 @@ def file_exists(storage_path: str) -> bool:
     except Exception as e:
         print(f"Error checking file existence: {e}")
         return False
+
+def create_signed_url(path: str, expires_in: int = 600) -> str:
+    """
+    Create a signed URL for a file in Supabase Storage.
+    expires_in is the number of seconds the URL is valid for (default 10 minutes).
+    """
+    try:
+        response = supabase.storage.from_(BUCKET).create_signed_url(path, expires_in)
+        return response["signedURL"]
+    except Exception as e:
+        raise Exception(f"Failed to create signed URL: {e}")
