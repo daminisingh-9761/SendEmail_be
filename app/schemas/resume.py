@@ -11,3 +11,6 @@ class ResumeOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+class PreviewUrlOut(BaseModel):
+    previewUrl: str

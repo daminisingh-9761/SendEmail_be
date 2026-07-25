@@ -122,3 +122,27 @@ async def delete_resume(
         
     await db.resumes.delete_one({"id": resume_id})
     return {"message": "Resume deleted successfully"}
+
+from app.schemas.resume import PreviewUrlOut
+
+@router.get("/{resume_id}/preview", response_model=PreviewUrlOut)
+async def preview_resume(
+    resume_id: str,
+    user: dict = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_db)
+):
+    # Requirement 6: 404 if resume doesn't exist, 403 if it belongs to another user
+    resume = await db.resumes.find_one({"id": resume_id})
+    if not resume:
+        raise HTTPException(404, "Resume not found")
+        
+    if resume["user_id"] != user["id"]:
+        raise HTTPException(403, "Forbidden: You do not have permission to view this resume")
+        
+    try:
+        # Create signed URL valid for 10 minutes (600 seconds)
+        signed_url = storage_service.create_signed_url(resume["storage_path"], 600)
+        return PreviewUrlOut(previewUrl=signed_url)
+    except Exception as e:
+        print(f"Error generating preview URL: {e}")
+        raise HTTPException(500, "Could not generate preview URL")
