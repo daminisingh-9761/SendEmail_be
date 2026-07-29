@@ -18,6 +18,8 @@ class ExtractedJobOut(BaseModel):
     keyRequirements: list[str]
     sourceType: str
     sourceRaw: str
+    responseType: str = "email"
+    chatResponse: str | None = None
 
 
 class GenerateEmailRequest(BaseModel):
