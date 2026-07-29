@@ -29,6 +29,20 @@ async def extract_job(
             raise HTTPException(400, "text is required")
         raw_text = payload.text
         source_raw = payload.text
+        ai = get_ai_provider()
+        classification = await ai.classify_text(raw_text)
+        if classification.get("responseType") == "chat":
+            return ExtractedJobOut(
+                id="",
+                jobTitle="",
+                company="",
+                summary="",
+                keyRequirements=[],
+                sourceType="text",
+                sourceRaw=raw_text,
+                responseType="chat",
+                chatResponse=classification.get("chatResponse")
+            )
 
     details = await job_extraction.extract_job_details(raw_text, payload.type, source_raw)
     application = await _create_draft_application(db, user, details)

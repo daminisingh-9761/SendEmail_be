@@ -9,6 +9,22 @@ from app.core.config import get_settings
 
 logger = logging.getLogger(__name__)
 
+CLASSIFY_SYSTEM_PROMPT = """You are an input classifier for an AI job application assistant.
+Your task is to determine whether the user's input is a Job Description or a conversational message.
+
+Categories:
+1. "job_description": The input looks like a job posting, job description, or a request to apply for a job.
+2. "chat": The input is a greeting (e.g., "Hi", "Hello"), casual conversation ("How are you?", "Thank you"), or a general question ("What is React?", "Explain Python").
+
+If the input is "chat", you must also provide a helpful and conversational AI response.
+
+Return ONLY valid JSON in this exact structure, no other text:
+{
+  "responseType": "email" | "chat",
+  "chatResponse": "string (only if responseType is 'chat', otherwise null)"
+}
+"""
+
 EXTRACT_SYSTEM_PROMPT = """You are a job-post parser. Given raw scraped or OCR'd text
 from a job listing, return ONLY valid JSON (no markdown fences) with keys:
 jobTitle, company, location, hrEmail, hrName, summary (2-3 sentences),
@@ -124,6 +140,9 @@ class AIProvider(ABC):
     @abstractmethod
     async def generate_follow_up(self, job: dict, original_body: str) -> str: ...
 
+    @abstractmethod
+    async def classify_text(self, text: str) -> dict: ...
+
 
 class OpenAIProvider(AIProvider):
     def __init__(self):
@@ -182,6 +201,9 @@ class OpenAIProvider(AIProvider):
             temperature=0.5,
         )
         return resp.choices[0].message.content.strip()
+
+    async def classify_text(self, text: str) -> dict:
+        return await self._json_completion(CLASSIFY_SYSTEM_PROMPT, text[:4000])
 
 
 class GeminiProvider(AIProvider):
@@ -248,6 +270,9 @@ class GeminiProvider(AIProvider):
         )
         resp = self.model.generate_content(prompt)
         return resp.text.strip()
+
+    async def classify_text(self, text: str) -> dict:
+        return await self._json_completion(CLASSIFY_SYSTEM_PROMPT, text[:4000])
 
 
 def get_ai_provider() -> AIProvider:
